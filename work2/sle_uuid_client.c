@@ -37,9 +37,15 @@ ssapc_callbacks_t             g_ssapc_cbk = {0};
 sle_addr_t                    g_remote_addr = {0};
 uint16_t                      g_conn_id = 0;
 ssapc_find_service_result_t   g_find_service_result = {0};
+static uint8_t g_sle_ready = 0;
 
 static void sle_client_send_key1(void)
 {
+    if (g_sle_ready == 0) {
+        test_suite_uart_sendf("[ssap client] not ready, ignore key 1\r\n");
+        return;
+    }
+
     uint8_t data[] = {'1'};
     uint8_t len = sizeof(data);
 
@@ -183,7 +189,9 @@ void sle_sample_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
         }
     }
     (void)conn_id;
-    sle_client_send_key1();
+
+    g_sle_ready = 1;
+    test_suite_uart_sendf("[ssap client] sle ready, wait key\r\n");
 }
 
 void sle_sample_find_property_cbk(uint8_t client_id, uint16_t conn_id,
