@@ -6,3 +6,4 @@
 # 保留自身
 !/.gitignore
 !/README.md
+!/convert.py
