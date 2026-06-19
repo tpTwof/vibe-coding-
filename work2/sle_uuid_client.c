@@ -21,6 +21,7 @@
 #include "sle_connection_manager.h"
 #include "sle_ssap_client.h"
 #include "sle_uuid_client.h"
+#include "iot_gpio.h"
 
 #undef THIS_FILE_ID
 #define THIS_FILE_ID BTH_GLE_SAMPLE_UUID_CLIENT
@@ -30,6 +31,9 @@
 #define SLE_SEEK_WINDOW_DEFAULT     100
 #define UUID_16BIT_LEN 2
 #define UUID_128BIT_LEN 16
+
+#define KEY_ENTER_GPIO 12
+#define KEY_TASK_STACK_SIZE 0x1000
 
 sle_announce_seek_callbacks_t g_seek_cbk = {0};
 sle_connection_callbacks_t    g_connect_cbk = {0};
@@ -58,6 +62,54 @@ static void sle_client_send_key1(void)
     test_suite_uart_sendf("[ssap client] send key: 1\r\n");
 
     ssapc_write_req(0, g_conn_id, &param);
+}
+
+static uint32_t read_enter_key(void)
+{
+    uint32_t value = IOT_GPIO_VALUE0;
+    IoTGpioGetInputVal(KEY_ENTER_GPIO, &value);
+    return value;
+}
+
+static void key_enter_task(void *arg)
+{
+    (void)arg;
+
+    test_suite_uart_sendf("[key] task start\r\n");
+    test_suite_uart_sendf("[key] GPIO%d active high\r\n", KEY_ENTER_GPIO);
+
+    IoTGpioInit(KEY_ENTER_GPIO);
+    IoTGpioSetDir(KEY_ENTER_GPIO, IOT_GPIO_DIR_IN);
+
+    while (1) {
+        if (read_enter_key() == IOT_GPIO_VALUE1) {
+            osal_msleep(20);
+
+            if (read_enter_key() == IOT_GPIO_VALUE1) {
+                test_suite_uart_sendf("[key] enter pressed\r\n");
+
+                sle_client_send_key1();
+
+                while (read_enter_key() == IOT_GPIO_VALUE1) {
+                    osal_msleep(20);
+                }
+            }
+        }
+
+        osal_msleep(10);
+    }
+}
+
+static void key_enter_task_start(void)
+{
+    osal_task *task_handle = NULL;
+
+    task_handle = osal_kthread_create((osal_kthread_handler)key_enter_task, 0,
+        "key_enter", KEY_TASK_STACK_SIZE);
+
+    if (task_handle != NULL) {
+        osal_kfree(task_handle);
+    }
 }
 
 void sle_sample_sle_enable_cbk(errcode_t status)
@@ -252,6 +304,9 @@ void sle_client_init()
     sle_announce_seek_register_callbacks(&g_seek_cbk);
     sle_connection_register_callbacks(&g_connect_cbk);
     ssapc_register_callbacks(&g_ssapc_cbk);
+
+    key_enter_task_start();
+
     enable_sle();
 }
 
