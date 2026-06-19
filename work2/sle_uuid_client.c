@@ -38,6 +38,22 @@ sle_addr_t                    g_remote_addr = {0};
 uint16_t                      g_conn_id = 0;
 ssapc_find_service_result_t   g_find_service_result = {0};
 
+static void sle_client_send_key1(void)
+{
+    uint8_t data[] = {'1'};
+    uint8_t len = sizeof(data);
+
+    ssapc_write_param_t param = {0};
+    param.handle = g_find_service_result.start_hdl;
+    param.type = SSAP_PROPERTY_TYPE_VALUE;
+    param.data_len = len;
+    param.data = data;
+
+    test_suite_uart_sendf("[ssap client] send key: 1\r\n");
+
+    ssapc_write_req(0, g_conn_id, &param);
+}
+
 void sle_sample_sle_enable_cbk(errcode_t status)
 {
     test_suite_uart_sendf("[ssap client] sle enable cbk status:%x\r\n", status);
@@ -166,18 +182,8 @@ void sle_sample_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
                 structure_result->uuid.uuid[idx]);
         }
     }
-    uint8_t data[] = {'1'};
-    uint8_t len = sizeof(data);
-
-    ssapc_write_param_t param = {0};
-    param.handle = g_find_service_result.start_hdl;
-    param.type = SSAP_PROPERTY_TYPE_VALUE;
-    param.data_len = len;
-    param.data = data;
-
-    test_suite_uart_sendf("[ssap client] send data: 1\r\n");
-
-    ssapc_write_req(0, conn_id, &param);
+    (void)conn_id;
+    sle_client_send_key1();
 }
 
 void sle_sample_find_property_cbk(uint8_t client_id, uint16_t conn_id,
