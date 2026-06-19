@@ -92,6 +92,12 @@ void sle_sample_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
 
     test_suite_uart_sendf("[ssap client] connect state changed conn_id:%x, conn_state:%x, pair_state:%x, reason:%x\r\n",
         conn_id, conn_state, pair_state, disc_reason);
+
+    if (conn_state == 1) {
+        g_conn_id = conn_id;
+        test_suite_uart_sendf("[ssap client] connected, start pair\r\n");
+        sle_pair_remote_device(&g_remote_addr);
+    }
 }
 
 void sle_sample_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
