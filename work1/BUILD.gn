@@ -1,0 +1,38 @@
+static_library("work1_demo") {
+    sources = [
+        "sle_uuid_server.c",
+        "sle_server_adv.c",
+    ]
+
+    defines = [
+        "CONFIG_UART_SUPPORT_TX",
+        "CONFIG_UART_SUPPORT_RX",
+    ]
+
+    include_dirs = [
+        ".",
+
+        "//commonlibrary/utils_lite/include",
+        "//kernel/liteos_m/components/cmsis/2.0",
+        "//base/iothardware/peripheral/interfaces/inner_api",
+
+        "//device/soc/hisilicon/ws63v100/sdk/include",
+        "//device/soc/hisilicon/ws63v100/sdk/include/middleware/services/bts/sle",
+        "//device/soc/hisilicon/ws63v100/sdk/include/middleware/utils",
+        "//device/soc/hisilicon/ws63v100/sdk/include/middleware",
+        "//device/soc/hisilicon/ws63v100/sdk/include/driver",
+
+        "//device/soc/hisilicon/ws63v100/sdk/kernel/osal/include",
+        "//device/soc/hisilicon/ws63v100/sdk/kernel/osal/include/memory",
+
+        "//device/soc/hisilicon/ws63v100/sdk/middleware/utils/app_init",
+        "//device/soc/hisilicon/ws63v100/sdk/drivers/drivers/hal/uart",
+        "//device/soc/hisilicon/ws63v100/sdk/drivers/chips/ws63/porting/uart",
+
+        "//device/soc/hisilicon/ws63v100/sdk/middleware/utils/common_headers/native",
+
+        "//device/soc/hisilicon/ws63v100/sdk/test/common/testsuite/include",
+
+        "//device/soc/hisilicon/ws63v100/sdk/application/samples/bt/sle/sle_uuid_server/inc",
+    ]
+}
