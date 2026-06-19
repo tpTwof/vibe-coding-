@@ -3,5 +3,6 @@
 # 但保留 work1 和 work2
 !/work1/
 !/work2/
-# 保留 .gitignore 自身
+# 保留自身
 !/.gitignore
+!/README.md
