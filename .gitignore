@@ -6,4 +6,5 @@
 # 保留自身
 !/.gitignore
 !/README.md
+!/BUILD.gn
 !/convert.py

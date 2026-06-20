@@ -106,12 +106,12 @@ static void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_r
     sample_at_log_print("\r\n");
 
     /*
-     * 如果收到的是字符 '1'，就单独输出一行 1
-     * 后面电脑 Python 脚本就是读这一行。
+     * 把收到的数据原样输出，Python 脚本识别 1/2/3D/3U
      */
-    if (write_cb_para->length == 1 && write_cb_para->value[0] == '1') {
-        sample_at_log_print("1\r\n");
+    for (uint16_t i = 0; i < write_cb_para->length; i++) {
+        sample_at_log_print("%c", write_cb_para->value[i]);
     }
+    sample_at_log_print("\r\n");
 }
 
 static void ssaps_mtu_changed_cbk(uint8_t server_id, uint16_t conn_id,  ssap_exchange_info_t *mtu_size,

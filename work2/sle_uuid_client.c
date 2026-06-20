@@ -14,6 +14,7 @@
  * Description: SLE private service register sample of client.
  */
 #include "securec.h"
+#include <string.h>
 #include "test_suite_uart.h"
 #include "soc_osal.h"
 #include "app_init.h"
@@ -32,7 +33,10 @@
 #define UUID_16BIT_LEN 2
 #define UUID_128BIT_LEN 16
 
-#define KEY_ENTER_GPIO 12
+#define KEY1_GPIO 12
+#define KEY2_GPIO 13
+#define KEY3_GPIO 14
+
 #define KEY_TASK_STACK_SIZE 0x1000
 
 sle_announce_seek_callbacks_t g_seek_cbk = {0};
@@ -43,55 +47,80 @@ uint16_t                      g_conn_id = 0;
 ssapc_find_service_result_t   g_find_service_result = {0};
 static uint8_t g_sle_ready = 0;
 
-static void sle_client_send_key1(void)
+static void sle_client_send_event(const char *event)
 {
     if (g_sle_ready == 0) {
-        test_suite_uart_sendf("[ssap client] not ready, ignore key 1\r\n");
+        test_suite_uart_sendf("[ssap client] not ready, ignore event:%s\r\n", event);
         return;
     }
-
-    uint8_t data[] = {'1'};
-    uint8_t len = sizeof(data);
 
     ssapc_write_param_t param = {0};
     param.handle = g_find_service_result.start_hdl;
     param.type = SSAP_PROPERTY_TYPE_VALUE;
-    param.data_len = len;
-    param.data = data;
+    param.data_len = strlen(event);
+    param.data = (uint8_t *)event;
 
-    test_suite_uart_sendf("[ssap client] send key: 1\r\n");
+    test_suite_uart_sendf("[ssap client] send event: %s\r\n", event);
 
     ssapc_write_req(0, g_conn_id, &param);
 }
 
-static uint32_t read_enter_key(void)
+typedef struct {
+    uint32_t gpio;
+    const char *down_event;
+    const char *up_event;
+    uint8_t pressed;
+} key_item_t;
+
+static key_item_t g_keys[] = {
+    {KEY1_GPIO, "1",  NULL, 0},
+    {KEY2_GPIO, "2",  NULL, 0},
+    {KEY3_GPIO, "3D", "3U", 0},
+};
+
+static uint32_t read_key_gpio(uint32_t gpio)
 {
     uint32_t value = IOT_GPIO_VALUE0;
-    IoTGpioGetInputVal(KEY_ENTER_GPIO, &value);
+    IoTGpioGetInputVal(gpio, &value);
     return value;
 }
 
-static void key_enter_task(void *arg)
+static void key_task(void *arg)
 {
     (void)arg;
 
-    test_suite_uart_sendf("[key] task start\r\n");
-    test_suite_uart_sendf("[key] GPIO%d active high\r\n", KEY_ENTER_GPIO);
+    test_suite_uart_sendf("[key] 3-key task start\r\n");
 
-    IoTGpioInit(KEY_ENTER_GPIO);
-    IoTGpioSetDir(KEY_ENTER_GPIO, IOT_GPIO_DIR_IN);
+    for (uint32_t i = 0; i < sizeof(g_keys) / sizeof(g_keys[0]); i++) {
+        IoTGpioInit(g_keys[i].gpio);
+        IoTGpioSetDir(g_keys[i].gpio, IOT_GPIO_DIR_IN);
+        test_suite_uart_sendf("[key] GPIO%d active high\r\n", g_keys[i].gpio);
+    }
 
     while (1) {
-        if (read_enter_key() == IOT_GPIO_VALUE1) {
-            osal_msleep(20);
+        for (uint32_t i = 0; i < sizeof(g_keys) / sizeof(g_keys[0]); i++) {
+            uint32_t value = read_key_gpio(g_keys[i].gpio);
 
-            if (read_enter_key() == IOT_GPIO_VALUE1) {
-                test_suite_uart_sendf("[key] enter pressed\r\n");
+            if (value == IOT_GPIO_VALUE1 && g_keys[i].pressed == 0) {
+                osal_msleep(20);
 
-                sle_client_send_key1();
+                if (read_key_gpio(g_keys[i].gpio) == IOT_GPIO_VALUE1) {
+                    g_keys[i].pressed = 1;
+                    test_suite_uart_sendf("[key] GPIO%d down\r\n", g_keys[i].gpio);
+                    sle_client_send_event(g_keys[i].down_event);
+                }
+            }
 
-                while (read_enter_key() == IOT_GPIO_VALUE1) {
-                    osal_msleep(20);
+            if (value == IOT_GPIO_VALUE0 && g_keys[i].pressed == 1) {
+                osal_msleep(20);
+
+                if (read_key_gpio(g_keys[i].gpio) == IOT_GPIO_VALUE0) {
+                    g_keys[i].pressed = 0;
+                    test_suite_uart_sendf("[key] GPIO%d up\r\n", g_keys[i].gpio);
+
+                    if (g_keys[i].up_event != NULL) {
+                        sle_client_send_event(g_keys[i].up_event);
+                    }
                 }
             }
         }
@@ -100,12 +129,12 @@ static void key_enter_task(void *arg)
     }
 }
 
-static void key_enter_task_start(void)
+static void key_task_start(void)
 {
     osal_task *task_handle = NULL;
 
-    task_handle = osal_kthread_create((osal_kthread_handler)key_enter_task, 0,
-        "key_enter", KEY_TASK_STACK_SIZE);
+    task_handle = osal_kthread_create((osal_kthread_handler)key_task, 0,
+        "key_task", KEY_TASK_STACK_SIZE);
 
     if (task_handle != NULL) {
         osal_kfree(task_handle);
@@ -305,7 +334,7 @@ void sle_client_init()
     sle_connection_register_callbacks(&g_connect_cbk);
     ssapc_register_callbacks(&g_ssapc_cbk);
 
-    key_enter_task_start();
+    key_task_start();
 
     enable_sle();
 }
