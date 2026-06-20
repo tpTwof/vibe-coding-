@@ -35,8 +35,8 @@
 #define UUID_128BIT_LEN 16
 
 #define KEY1_GPIO 12
-#define KEY2_GPIO 13
-#define KEY3_GPIO 14
+#define KEY2_GPIO 11
+#define KEY3_GPIO 10
 
 #define KEY_TASK_STACK_SIZE 0x1000
 
@@ -101,37 +101,32 @@ static void key_task(void *arg)
         test_suite_uart_sendf("[key] GPIO%d pull-down\r\n", g_keys[i].gpio);
     }
 
-    static uint32_t debug_count = 0;
-
     while (1) {
-        debug_count++;
-        if (debug_count >= 50) {
-            debug_count = 0;
+        for (uint32_t i = 0; i < sizeof(g_keys) / sizeof(g_keys[0]); i++) {
+            uint32_t value = read_key_gpio(g_keys[i].gpio);
 
-            test_suite_uart_sendf(
-                "[gpio] 0=%d 1=%d 2=%d 3=%d 4=%d 5=%d 6=%d 7=%d 8=%d 9=%d 10=%d 11=%d 12=%d 13=%d 14=%d 15=%d 16=%d 17=%d 18=%d 19=%d 20=%d\r\n",
-                read_key_gpio(0),
-                read_key_gpio(1),
-                read_key_gpio(2),
-                read_key_gpio(3),
-                read_key_gpio(4),
-                read_key_gpio(5),
-                read_key_gpio(6),
-                read_key_gpio(7),
-                read_key_gpio(8),
-                read_key_gpio(9),
-                read_key_gpio(10),
-                read_key_gpio(11),
-                read_key_gpio(12),
-                read_key_gpio(13),
-                read_key_gpio(14),
-                read_key_gpio(15),
-                read_key_gpio(16),
-                read_key_gpio(17),
-                read_key_gpio(18),
-                read_key_gpio(19),
-                read_key_gpio(20)
-            );
+            if (value == IOT_GPIO_VALUE1 && g_keys[i].pressed == 0) {
+                osal_msleep(20);
+
+                if (read_key_gpio(g_keys[i].gpio) == IOT_GPIO_VALUE1) {
+                    g_keys[i].pressed = 1;
+                    test_suite_uart_sendf("[key] GPIO%d down\r\n", g_keys[i].gpio);
+                    sle_client_send_event(g_keys[i].down_event);
+                }
+            }
+
+            if (value == IOT_GPIO_VALUE0 && g_keys[i].pressed == 1) {
+                osal_msleep(20);
+
+                if (read_key_gpio(g_keys[i].gpio) == IOT_GPIO_VALUE0) {
+                    g_keys[i].pressed = 0;
+                    test_suite_uart_sendf("[key] GPIO%d up\r\n", g_keys[i].gpio);
+
+                    if (g_keys[i].up_event != NULL) {
+                        sle_client_send_event(g_keys[i].up_event);
+                    }
+                }
+            }
         }
 
         osal_msleep(10);
