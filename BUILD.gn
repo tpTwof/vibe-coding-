@@ -17,9 +17,5 @@ lite_component("app") {
   features = [ "startup",
     "work1:work1_demo",
     "work2:work2_demo",
-
-
-    
-  
-    ]
+  ]
 }
