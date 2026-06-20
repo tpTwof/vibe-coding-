@@ -109,6 +109,8 @@ def main():
 
             if event in ["1", "2", "3D", "3U"]:
                 id2real(event)
+            elif event.startswith("[event] "):
+                id2real(event[8:])
             else:
                 print(f"忽略串口日志：{event}")
 

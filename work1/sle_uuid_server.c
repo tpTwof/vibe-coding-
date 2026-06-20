@@ -106,8 +106,9 @@ static void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_r
     sample_at_log_print("\r\n");
 
     /*
-     * 把收到的数据原样输出，Python 脚本识别 1/2/3D/3U
+     * 输出事件数据，Python 脚本监听 [event] 开头的行
      */
+    sample_at_log_print("[event] ");
     for (uint16_t i = 0; i < write_cb_para->length; i++) {
         sample_at_log_print("%c", write_cb_para->value[i]);
     }
