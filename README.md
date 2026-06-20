@@ -2,14 +2,14 @@
 
 ## 项目简介
 
-用两块**九联星闪开发板（海思 WS63E）**，通过**星闪 SLE** 无线协议，实现一个物理键盘宏：
+用两块**九联星闪开发板（海思 WS63E）**，通过**星闪 SLE** 无线协议，实现三按键无线宏键盘：
 
 ```
 ┌──────────────────┐       SLE 无线        ┌──────────────────┐
 │   板 A (Client)   │ ◄──────────────────► │   板 B (Server)   │
 │   烧录 work2      │                       │   烧录 work1      │
 │                   │   扫描→连接→发送按键   │                   │
-│  GPIO12 按键 ────►│   发送 "1" "3D" 等    │  收到→串口→电脑   │
+│  GPIO10/11/12 ───►│   发送 1/2/3D/3U      │  收到→串口→电脑   │
 └──────────────────┘                       └────────┬─────────┘
                                                     │ USB 串口
                                                     ▼
@@ -33,61 +33,40 @@
 
 ### Client 板（work2）
 
-| 引脚 | 连接 |
-|------|------|
-| USB | 供电即可 |
-| GPIO12 | 按键（一端接 GPIO12，一端接 GND）|
+| GPIO | 连接 | 按键功能 |
+|------|------|---------|
+| GPIO10 | → 按键 → 3.3V | Enter |
+| GPIO11 | → 按键 → 3.3V | Backspace |
+| GPIO12 | → 按键 → 3.3V | 语音键（Ctrl+Win） |
 
-按键为**低电平有效**，实际检测逻辑为上升沿（松开时触发）。
+按键按下时 GPIO 读到高电平，松开时内部下拉拉低。
 
 ---
 
 ## 按键功能
 
-| 按键 | SLE 发送 | 串口输出 | PC 动作 |
+| GPIO | 按下发送 | 松开发送 | PC 动作 |
 |------|---------|---------|---------|
-| GPIO12 按下松开 | `1` | `1` | `Enter` |
-| GPIO12 长按 | `3D` | `3D` | `Ctrl+Win` 按下（语音输入） |
-| GPIO12 长按松开 | `3U` | `3U` | `Ctrl+Win` 松开 |
+| 10 | `1` | — | Enter |
+| 11 | `2` | — | Backspace |
+| 12 | `3D` | `3U` | Ctrl+Win 按下 / 松开 |
 
 ---
 
-## 软件架构
+## 串口协议
 
-```
-work2 (Client)                    work1 (Server)                PC
-──────────────                    ──────────────                ──
-上电                             上电
-  │                                │
-  ├─ key_enter_task_start()        ├─ sle_uuid_server_init()
-  │   (GPIO12 轮询线程)             │    (注册 UUID 服务)
-  │                                │
-  ├─ enable_sle()                  ├─ 开始广播
-  │   → sle_start_scan()           │   "sle_uuid_server"
-  │                                │
-  ├─ 扫到设备 ──→ 连接 ──→ 配对     │
-  │                                │
-  ├─ 发现服务结构                    │
-  │                                │
-  ├─ g_sle_ready = 1               │
-  │   "[ssap client] sle ready"    │
-  │                                │
-  ├─ GPIO12 按下                    │
-  │   sle_client_send_key1()       │
-  │   → ssapc_write_req("1") ──────┤→ 收到 "1"
-  │                                │   → printf("1\r\n")
-  │                                │       │
-  │                                │       └──→ USB 串口
-  │                                │            │
-  │                                │       convert.py 读取
-  │                                │       → pyautogui.press("enter")
-```
+Server 收到 SLE 数据后，把数据原样转成字符通过串口输出，每行一个事件：
+
+| 串口输出 | Python 动作 |
+|---------|------------|
+| `1` | `pyautogui.press("enter")` |
+| `2` | `pyautogui.press("backspace")` |
+| `3D` | `keyDown("ctrl")` + `keyDown("win")` |
+| `3U` | `keyUp("win")` + `keyUp("ctrl")` |
 
 ---
 
 ## 构建与烧录
-
-### 编译
 
 ```bash
 cd /root/ws63_ohos
@@ -99,17 +78,11 @@ python build.py -p nearlink_dk_3863@hihope -T "applications/sample/wifi-iot/app/
 python build.py -p nearlink_dk_3863@hihope -T "applications/sample/wifi-iot/app/work2:work2_demo"
 ```
 
-### 烧录
-
-用海思烧录工具分别烧录两块板：
-- 板 A → `work2` 的固件
-- 板 B → `work1` 的固件
+两块板分别烧录对应固件。
 
 ---
 
-## convert.py — 串口宏键盘脚本
-
-运行在 **PC 端**，读取 Server 板的串口输出，用 `pyautogui` 模拟键盘操作。
+## convert.py — PC 端串口宏键盘
 
 ### 安装依赖
 
@@ -122,7 +95,7 @@ pip install pyautogui pyserial
 编辑 `convert.py` 顶部：
 
 ```python
-SERIAL_PORT = "COM15"   # 改成 Server 板的实际 COM 口
+SERIAL_PORT = "COM15"   # Server 板串口号
 BAUD_RATE = 115200
 ```
 
@@ -132,18 +105,7 @@ BAUD_RATE = 115200
 python convert.py
 ```
 
-**使用前先关闭串口助手**，否则 COM 口会被占用。
-
-### 串口协议
-
-Server 通过串口发送单行事件：
-
-| 串口数据 | 含义 | pyautogui 动作 |
-|---------|------|---------------|
-| `1` | Enter 键 | `pyautogui.press("enter")` |
-| `2` | Backspace 键 | `pyautogui.press("backspace")` |
-| `3D` | 语音键按下 | `keyDown("ctrl")` + `keyDown("win")` |
-| `3U` | 语音键松开 | `keyUp("win")` + `keyUp("ctrl")` |
+按 `Ctrl+C` 退出，脚本会自动释放按键防止卡键。
 
 ---
 
@@ -168,8 +130,6 @@ app/
     ├── sle_uuid_client.h
     └── sle_uuid_client.c
 ```
-
----
 
 ## 依赖
 
