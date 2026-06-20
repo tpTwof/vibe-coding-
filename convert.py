@@ -1,104 +1,96 @@
+"""
+串口宏键盘脚本。
+监听 Server 串口，收到事件 ID 后调用 pyautogui 模拟键盘操作。
+
+事件对应：
+  1  -> Enter
+  2  -> Backspace
+  3U -> Ctrl+Win 切换（按下/松开）
+  3D -> Ctrl+Win 按下（长按兼容）
+
+用法：
+  python convert.py
+  按 Ctrl+C 退出。
+"""
 import pyautogui
-import time
 import serial
 import sys
+import time
 
-#
-SERIAL_PORT = "COM15"
+# ====== 配置 ======
+SERIAL_PORT = "COM15"   # Server 板的串口号
 BAUD_RATE = 115200
 
 pyautogui.FAILSAFE = True
-
 voice_key_down = False
 
 
-#调试功能
-def countdown():
-    print("3")
-    time.sleep(1)
-    print("2")
-    time.sleep(1)
-    print("1")
-    time.sleep(1)
-
 def release_voice_keys():
-    """
-    确保 Ctrl + Win 被松开，防止程序退出后按键卡住。
-    """
+    """确保退出时释放 Ctrl+Win，防止卡键。"""
     global voice_key_down
-
     try:
         pyautogui.keyUp("winleft")
         pyautogui.keyUp("ctrlleft")
     except Exception:
         pass
-
     voice_key_down = False
 
-def id2real(event: str):
 
+def id2real(event: str):
+    """把事件 ID 转成键盘操作。"""
     global voice_key_down
 
-    event = event.strip()
-
     if event == "1":
-        print("执行 Enter")
+        # Enter
+        print("Enter")
         pyautogui.press("enter")
 
     elif event == "2":
-        print("执行 Backspace")
+        # Backspace
+        print("Backspace")
         pyautogui.press("backspace")
 
-    elif event == "3D":
-        if not voice_key_down:
-            print("Ctrl + Win 按下，开始语音")
-            pyautogui.keyDown("ctrlleft")
-            pyautogui.keyDown("winleft")
-            voice_key_down = True
-        else:
-            print(f'已经收到3D')
-
     elif event == "3U":
+        # Ctrl+Win 切换（按下则松开，松开则按下）
         if voice_key_down:
-            print("Ctrl + Win 松开，结束语音")
+            print("Ctrl+Win UP")
             pyautogui.keyUp("winleft")
             pyautogui.keyUp("ctrlleft")
             voice_key_down = False
         else:
-            print(f'按键并未按下')
+            print("Ctrl+Win DOWN")
+            pyautogui.keyDown("ctrlleft")
+            pyautogui.keyDown("winleft")
+            voice_key_down = True
+
+    elif event == "3D":
+        # Ctrl+Win 按下（长按兼容）
+        if not voice_key_down:
+            print("Ctrl+Win DOWN")
+            pyautogui.keyDown("ctrlleft")
+            pyautogui.keyDown("winleft")
+            voice_key_down = True
 
     else:
-        print("未知事件")
+        print(f"未知事件: {event}")
 
 
-print("输入 1  = Enter")
-print("输入 2  = Backspace")
-print("输入 3D = Ctrl+Win 按下")
-print("输入 3U = Ctrl+Win 松开")
-print("输入 q  = 退出")
+# ====== 主循环 ======
+print("1=Enter  2=Backspace  3U=Voice toggle  3D=Voice down")
+print("-" * 40)
 
 
 def main():
-    print("步骤 3：串口宏键盘脚本启动")
-    print(f"正在打开串口：{SERIAL_PORT}, 波特率：{BAUD_RATE}")
-    print("请确保串口助手已经关闭，否则 COM7 会被占用。")
-    print("按 Ctrl + C 可以退出脚本。")
-    print("-" * 40)
-
+    print(f"打开串口 {SERIAL_PORT}，波特率 {BAUD_RATE} ...")
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
     except serial.SerialException as e:
-        print(f"串口打开失败：{e}")
-        print("请检查：")
-        print("1. 开发板是否插上电脑")
-        print("2. COM 口是否真的是 COM7")
-        print("3. 串口助手是否已经关闭")
+        print(f"串口打开失败: {e}")
         sys.exit(1)
 
     try:
         while True:
             line = ser.readline()
-
             if not line:
                 continue
 
@@ -107,21 +99,19 @@ def main():
             except Exception:
                 continue
 
-            # 只处理 [event] 开头的行
-            if text.startswith("[event] "):
-                id2real(text[8:])
-            else:
-                print(f"忽略：{text}")
+            # 匹配事件 ID（整行完全等于 1/2/3D/3U）
+            if text in ("1", "2", "3D", "3U"):
+                id2real(text)
 
             time.sleep(0.01)
 
     except KeyboardInterrupt:
-        print("\n检测到 Ctrl + C，准备退出...")
+        print("\n退出中...")
 
     finally:
         release_voice_keys()
         ser.close()
-        print("已释放 Ctrl + Win，并关闭串口。")
+        print("已释放按键，串口已关闭。")
 
 
 if __name__ == "__main__":

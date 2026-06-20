@@ -34,9 +34,9 @@
 #define UUID_16BIT_LEN 2
 #define UUID_128BIT_LEN 16
 
-#define KEY1_GPIO 12
-#define KEY2_GPIO 11
-#define KEY3_GPIO 10
+#define KEY1_GPIO 10  /* Enter */
+#define KEY2_GPIO 11  /* Backspace */
+#define KEY3_GPIO 12  /* Voice toggle (3U) */
 
 #define KEY_TASK_STACK_SIZE 0x1000
 
@@ -74,9 +74,9 @@ typedef struct {
 } key_item_t;
 
 static key_item_t g_keys[] = {
-    {KEY1_GPIO, "1",  NULL, 0},
-    {KEY2_GPIO, "2",  NULL, 0},
-    {KEY3_GPIO, "3D", "3U", 0},
+    {KEY1_GPIO, "1",  NULL, 0},  /* GPIO10 -> Enter */
+    {KEY2_GPIO, "2",  NULL, 0},  /* GPIO11 -> Backspace */
+    {KEY3_GPIO, "3U", NULL, 0},  /* GPIO12 -> Voice toggle */
 };
 
 static uint32_t read_key_gpio(uint32_t gpio)
