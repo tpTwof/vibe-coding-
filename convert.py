@@ -51,17 +51,12 @@ def id2real(event: str):
         pyautogui.press("backspace")
 
     elif event == "3U":
-        # Ctrl+Win 切换（按下则松开，松开则按下）
+        # Ctrl+Win 松开
         if voice_key_down:
             print("Ctrl+Win UP")
             pyautogui.keyUp("winleft")
             pyautogui.keyUp("ctrlleft")
             voice_key_down = False
-        else:
-            print("Ctrl+Win DOWN")
-            pyautogui.keyDown("ctrlleft")
-            pyautogui.keyDown("winleft")
-            voice_key_down = True
 
     elif event == "3D":
         # Ctrl+Win 按下（长按兼容）
