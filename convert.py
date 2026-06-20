@@ -2,7 +2,6 @@ import pyautogui
 import time
 import serial
 import sys
-import re
 
 #
 SERIAL_PORT = "COM15"
@@ -96,8 +95,6 @@ def main():
         print("3. 串口助手是否已经关闭")
         sys.exit(1)
 
-    EVENTS = ["3D", "3U", "1", "2"]  # 长优先
-
     try:
         while True:
             line = ser.readline()
@@ -110,14 +107,9 @@ def main():
             except Exception:
                 continue
 
-            matched = None
-            for ev in EVENTS:
-                if re.search(r'\b' + re.escape(ev) + r'\b', text):
-                    matched = ev
-                    break
-
-            if matched:
-                id2real(matched)
+            # 只处理 [event] 开头的行
+            if text.startswith("[event] "):
+                id2real(text[8:])
             else:
                 print(f"忽略：{text}")
 
