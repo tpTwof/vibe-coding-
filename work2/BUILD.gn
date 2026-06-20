@@ -27,6 +27,7 @@ static_library("work2_demo") {
         "//device/soc/hisilicon/ws63v100/sdk/middleware/utils/app_init",
         "//device/soc/hisilicon/ws63v100/sdk/drivers/drivers/hal/uart",
         "//device/soc/hisilicon/ws63v100/sdk/drivers/chips/ws63/porting/uart",
+        "//device/soc/hisilicon/ws63v100/sdk/drivers/chips/ws63/porting/pinctrl",
 
         "//device/soc/hisilicon/ws63v100/sdk/middleware/utils/common_headers/native",
 

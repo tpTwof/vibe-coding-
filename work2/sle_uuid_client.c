@@ -23,6 +23,7 @@
 #include "sle_ssap_client.h"
 #include "sle_uuid_client.h"
 #include "iot_gpio.h"
+#include "pinctrl.h"
 
 #undef THIS_FILE_ID
 #define THIS_FILE_ID BTH_GLE_SAMPLE_UUID_CLIENT
@@ -66,7 +67,7 @@ static void sle_client_send_event(const char *event)
 }
 
 typedef struct {
-    uint32_t gpio;
+    pin_t gpio;
     const char *down_event;
     const char *up_event;
     uint8_t pressed;
@@ -91,10 +92,13 @@ static void key_task(void *arg)
 
     test_suite_uart_sendf("[key] 3-key task start\r\n");
 
+    uapi_pin_init();
+
     for (uint32_t i = 0; i < sizeof(g_keys) / sizeof(g_keys[0]); i++) {
         IoTGpioInit(g_keys[i].gpio);
         IoTGpioSetDir(g_keys[i].gpio, IOT_GPIO_DIR_IN);
-        test_suite_uart_sendf("[key] GPIO%d active high\r\n", g_keys[i].gpio);
+        uapi_pin_set_pull(g_keys[i].gpio, PIN_PULL_TYPE_DOWN);
+        test_suite_uart_sendf("[key] GPIO%d pull-down\r\n", g_keys[i].gpio);
     }
 
     while (1) {
