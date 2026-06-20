@@ -101,9 +101,16 @@ static void key_task(void *arg)
         test_suite_uart_sendf("[key] GPIO%d pull-down\r\n", g_keys[i].gpio);
     }
 
+    uint32_t debug_cnt = 0;
+
     while (1) {
         for (uint32_t i = 0; i < sizeof(g_keys) / sizeof(g_keys[0]); i++) {
             uint32_t value = read_key_gpio(g_keys[i].gpio);
+
+            if (debug_cnt == 0) {
+                test_suite_uart_sendf("[key] GPIO%d val=%d pressed=%d\r\n",
+                    g_keys[i].gpio, value, g_keys[i].pressed);
+            }
 
             if (value == IOT_GPIO_VALUE1 && g_keys[i].pressed == 0) {
                 osal_msleep(20);
@@ -129,6 +136,7 @@ static void key_task(void *arg)
             }
         }
 
+        debug_cnt = (debug_cnt + 1) % 100;
         osal_msleep(10);
     }
 }
