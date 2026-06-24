@@ -60,41 +60,49 @@ errcode_t sle_uuid_server_init(void);
  * @if Eng
  * @brief  send data to peer device by uuid on uuid server.
  * @attention  NULL
- * @param  [in]  value  send value.
- * @param  [in]  len    Length of send value。
+ * @param  [in]  conn_id  connection handle.
+ * @param  [in]  data     send value.
+ * @param  [in]  len      Length of send value.
  * @retval ERRCODE_SLE_SUCCESS    Excute successfully
  * @retval ERRCODE_SLE_FAIL       Execute fail
  * @par Dependency:
  * @li sle_ssap_server.h
  * @else
- * @brief  通过uuid server 发送数据给对端。
+ * @brief  通过uuid server 发送数据给指定连接。
  * @attention  NULL
+ * @param  [in]  conn_id  连接句柄。
+ * @param  [in]  data     发送数据。
+ * @param  [in]  len      数据长度。
  * @retval ERRCODE_SLE_SUCCESS    执行成功
  * @retval ERRCODE_SLE_FAIL       执行失败
  * @par 依赖:
  * @li sle_ssap_server.h
  * @endif
  */
-errcode_t sle_uuid_server_send_report_by_uuid(const uint8_t *data, uint16_t len);
+errcode_t sle_uuid_server_send_report_by_uuid(uint16_t conn_id, const uint8_t *data, uint16_t len);
 
 /**
  * @if Eng
  * @brief  send data to peer device by handle on uuid server.
  * @attention  NULL
- * @param  [in]  value  send value.
- * @param  [in]  len    Length of send value。
+ * @param  [in]  conn_id  connection handle.
+ * @param  [in]  data     send value.
+ * @param  [in]  len      Length of send value.
  * @retval ERRCODE_SLE_SUCCESS    Excute successfully
  * @retval ERRCODE_SLE_FAIL       Execute fail
  * @par Dependency:
  * @li sle_ssap_server.h
  * @else
- * @brief  通过uuid server 发送数据给对端。
+ * @brief  通过uuid server 发送数据给指定连接。
  * @attention  NULL
+ * @param  [in]  conn_id  连接句柄。
+ * @param  [in]  data     发送数据。
+ * @param  [in]  len      数据长度。
  * @retval ERRCODE_SLE_SUCCESS    执行成功
  * @retval ERRCODE_SLE_FAIL       执行失败
  * @par 依赖:
  * @li sle_ssap_server.h
  * @endif
  */
-errcode_t sle_uuid_server_send_report_by_handle(const uint8_t *data, uint8_t len);
+errcode_t sle_uuid_server_send_report_by_handle(uint16_t conn_id, const uint8_t *data, uint8_t len);
 #endif

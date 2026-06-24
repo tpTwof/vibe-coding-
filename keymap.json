@@ -1,0 +1,18 @@
+{
+  "1": {
+    "type": "PRESS",
+    "keys": ["enter"]
+  },
+  "2": {
+    "type": "PRESS",
+    "keys": ["backspace"]
+  },
+  "3D": {
+    "type": "HOLD_DOWN",
+    "keys": ["ctrlleft", "winleft"]
+  },
+  "3U": {
+    "type": "HOLD_UP",
+    "keys": ["ctrlleft", "winleft"]
+  }
+}

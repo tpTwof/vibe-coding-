@@ -13,6 +13,8 @@
  * limitations under the License.
  * Description: sle uuid server sample.
  */
+#include <stddef.h>
+#include <string.h>
 #include "securec.h"
 #include "errcode.h"
 #include "osal_addr.h"
@@ -26,6 +28,7 @@
 #include "sle_device_discovery.h"
 #include "sle_server_adv.h"
 #include "sle_uuid_server.h"
+#include "at.h"
 
 #define OCTET_BIT_LEN 8
 #define UUID_LEN_2     2
@@ -43,8 +46,6 @@
 char g_sle_uuid_app_uuid[UUID_LEN_2] = {0x0, 0x0};
 /* server notify property uuid for test */
 char g_sle_property_value[OCTET_BIT_LEN] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
-/* sle connect acb handle */
-uint16_t g_sle_conn_hdl = 0;
 /* sle server handle */
 uint8_t g_server_id = 0;
 /* sle service handle */
@@ -53,6 +54,128 @@ uint16_t g_service_handle = 0;
 uint16_t g_property_handle = 0;
 
 #define sample_at_log_print(fmt, args...) test_suite_uart_sendf(fmt, ##args)
+
+/* 多连接管理 */
+#define MAX_SLE_CONNECTIONS 1
+static uint16_t g_conn_handles[MAX_SLE_CONNECTIONS];
+static uint8_t g_conn_count = 0;
+static uint8_t g_conn_ready[MAX_SLE_CONNECTIONS];
+static char g_led_state[32] = "@LED:DONE";
+
+static void sle_uuid_server_send_led_state(uint16_t conn_id)
+{
+    (void)sle_uuid_server_send_report_by_uuid(conn_id, (const uint8_t *)g_led_state, strlen(g_led_state));
+}
+
+static void sle_uuid_server_broadcast_led_state(void)
+{
+    for (uint8_t i = 0; i < g_conn_count; i++) {
+        if (g_conn_ready[i] != 0) {
+            sle_uuid_server_send_led_state(g_conn_handles[i]);
+        }
+    }
+}
+
+static void conn_mark_ready(uint16_t conn_id)
+{
+    for (uint8_t i = 0; i < g_conn_count; i++) {
+        if (g_conn_handles[i] == conn_id) {
+            g_conn_ready[i] = 1;
+            sample_at_log_print("[led] conn:%d ready\r\n", conn_id);
+            return;
+        }
+    }
+}
+
+typedef struct {
+    uint32_t para_map;
+    const uint8_t *state;
+} led_at_args_t;
+
+static at_ret_t at_led_set(const led_at_args_t *args)
+{
+    const char *payload;
+
+    if (args == NULL || args->state == NULL) {
+        return AT_RET_SYNTAX_ERROR;
+    }
+
+    if (strcmp((const char *)args->state, "RUNNING") == 0) {
+        payload = "@LED:RUNNING";
+    } else if (strcmp((const char *)args->state, "DONE") == 0) {
+        payload = "@LED:DONE";
+    } else if (strcmp((const char *)args->state, "ATTENTION") == 0) {
+        payload = "@LED:ATTENTION";
+    } else {
+        return AT_RET_SYNTAX_ERROR;
+    }
+
+    if (memcpy_s(g_led_state, sizeof(g_led_state), payload, strlen(payload) + 1) != EOK) {
+        return AT_RET_MEM_API_ERROR;
+    }
+    sample_at_log_print("[led] AT state:%s\r\n", g_led_state);
+    sle_uuid_server_broadcast_led_state();
+    return AT_RET_OK;
+}
+
+static const at_para_parse_syntax_t g_led_at_syntax[] = {
+    {
+        .type = AT_SYNTAX_TYPE_STRING,
+        .last = true,
+        .attribute = AT_SYNTAX_ATTR_MAX_LENGTH,
+        .offset = offsetof(led_at_args_t, state),
+        .entry.string.max_length = 9,
+    },
+};
+
+static const at_cmd_entry_t g_led_at_cmd[] = {
+    {
+        .name = "LED",
+        .cmd_id = 0x4C45,
+        .attribute = 0,
+        .syntax = g_led_at_syntax,
+        .cmd = NULL,
+        .set = (at_set_func_t)at_led_set,
+        .read = NULL,
+        .test = NULL,
+    },
+};
+
+static void at_led_command_register(void)
+{
+    errcode_t ret = uapi_at_cmd_table_register(g_led_at_cmd,
+        sizeof(g_led_at_cmd) / sizeof(g_led_at_cmd[0]), sizeof(led_at_args_t));
+    sample_at_log_print("[server] AT+LED register ret:%x\r\n", ret);
+}
+
+static void conn_add(uint16_t conn_id)
+{
+    for (uint8_t i = 0; i < g_conn_count; i++) {
+        if (g_conn_handles[i] == conn_id) {
+            return;
+        }
+    }
+    if (g_conn_count < MAX_SLE_CONNECTIONS) {
+        g_conn_handles[g_conn_count] = conn_id;
+        g_conn_ready[g_conn_count] = 0;
+        g_conn_count++;
+        sample_at_log_print("[uuid server] conn added, total:%d\r\n", g_conn_count);
+    }
+}
+
+static void conn_remove(uint16_t conn_id)
+{
+    for (uint8_t i = 0; i < g_conn_count; i++) {
+        if (g_conn_handles[i] == conn_id) {
+            g_conn_count--;
+            g_conn_handles[i] = g_conn_handles[g_conn_count];
+            g_conn_ready[i] = g_conn_ready[g_conn_count];
+            g_conn_ready[g_conn_count] = 0;
+            sample_at_log_print("[uuid server] conn removed, total:%d\r\n", g_conn_count);
+            return;
+        }
+    }
+}
 
 static uint8_t sle_uuid_base[] = { 0x37, 0xBE, 0xA8, 0x80, 0xFC, 0x70, 0x11, 0xEA, \
     0xB7, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
@@ -80,30 +203,28 @@ static void ssaps_read_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_re
 static void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_write_cb_t *write_cb_para,
     errcode_t status)
 {
-    sample_at_log_print("[uuid server] write cbk server_id:%x, conn_id:%x, status:%x\r\n",
-        server_id, conn_id, status);
+    (void)server_id;
+    (void)status;
 
-    if (write_cb_para == NULL) {
-        sample_at_log_print("[uuid server] write_cb_para is NULL\r\n");
+    if (write_cb_para == NULL || write_cb_para->value == NULL || write_cb_para->length == 0) {
         return;
     }
 
-    sample_at_log_print("[uuid server] handle:%x, length:%d\r\n",
-        write_cb_para->handle, write_cb_para->length);
+    char buf[64] = {0};
+    uint16_t copy_len = (write_cb_para->length < sizeof(buf) - 1) ?
+        write_cb_para->length : sizeof(buf) - 1;
+    (void)memcpy_s(buf, sizeof(buf), write_cb_para->value, copy_len);
+    buf[copy_len] = '\0';
 
-    if (write_cb_para->value == NULL || write_cb_para->length == 0) {
-        sample_at_log_print("[uuid server] empty value\r\n");
+    if (strcmp(buf, "@LED:SYNC") == 0) {
+        conn_mark_ready(conn_id);
+        sample_at_log_print("[led] sync conn:%d state:%s\r\n", conn_id, g_led_state);
+        sle_uuid_server_send_led_state(conn_id);
         return;
     }
 
-    /*
-     * 把收到的数据原样转成字符输出，独占一行。
-     * Python 脚本识别行首的 1/2/3D/3U 事件。
-     */
-    for (uint16_t i = 0; i < write_cb_para->length; i++) {
-        sample_at_log_print("%c", write_cb_para->value[i]);
-    }
-    sample_at_log_print("\r\n");
+    /* All regular SLE key events are forwarded to the PC serial port unchanged. */
+    sample_at_log_print("%s\r\n", buf);
 }
 
 static void ssaps_mtu_changed_cbk(uint8_t server_id, uint16_t conn_id,  ssap_exchange_info_t *mtu_size,
@@ -225,8 +346,8 @@ static errcode_t sle_uuid_server_add(void)
     return ERRCODE_SLE_SUCCESS;
 }
 
-/* device通过uuid向host发送数据：report */
-errcode_t sle_uuid_server_send_report_by_uuid(const uint8_t *data, uint16_t len)
+/* device通过uuid向指定连接发送数据：report */
+errcode_t sle_uuid_server_send_report_by_uuid(uint16_t conn_id, const uint8_t *data, uint16_t len)
 {
     ssaps_ntf_ind_by_uuid_t param = {0};
     param.type = SSAP_PROPERTY_TYPE_VALUE;
@@ -244,13 +365,13 @@ errcode_t sle_uuid_server_send_report_by_uuid(const uint8_t *data, uint16_t len)
         return ERRCODE_SLE_FAIL;
     }
     sle_uuid_setu2(SLE_UUID_SERVER_NTF_REPORT, &param.uuid);
-    ssaps_notify_indicate_by_uuid(g_server_id, g_sle_conn_hdl, &param);
+    ssaps_notify_indicate_by_uuid(g_server_id, conn_id, &param);
     osal_vfree(param.value);
     return ERRCODE_SLE_SUCCESS;
 }
 
-/* device通过handle向host发送数据：report */
-errcode_t sle_uuid_server_send_report_by_handle(const uint8_t *data, uint8_t len)
+/* device通过handle向指定连接发送数据：report */
+errcode_t sle_uuid_server_send_report_by_handle(uint16_t conn_id, const uint8_t *data, uint8_t len)
 {
     ssaps_ntf_ind_t param = {0};
 
@@ -267,7 +388,7 @@ errcode_t sle_uuid_server_send_report_by_handle(const uint8_t *data, uint8_t len
         osal_vfree(param.value);
         return ERRCODE_SLE_FAIL;
     }
-    ssaps_notify_indicate(g_server_id, g_sle_conn_hdl, &param);
+    ssaps_notify_indicate(g_server_id, conn_id, &param);
     osal_vfree(param.value);
     return ERRCODE_SLE_SUCCESS;
 }
@@ -279,7 +400,15 @@ static void sle_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
         disc_reason:0x%x\r\n", conn_id, conn_state, pair_state, disc_reason);
     sample_at_log_print("[uuid server] connect state changed addr:%02x:**:**:**:%02x:%02x\r\n",
         addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4], addr->addr[BT_INDEX_5]);
-    g_sle_conn_hdl = conn_id;
+
+    if (conn_state == SLE_ACB_STATE_CONNECTED) {
+        conn_add(conn_id);
+        sample_at_log_print("[uuid server] connected, total:%d, max:%d\r\n", g_conn_count, MAX_SLE_CONNECTIONS);
+    } else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
+        conn_remove(conn_id);
+        sample_at_log_print("[uuid server] disconnected, remaining:%d\r\n", g_conn_count);
+        sle_uuid_server_adv_restart();
+    }
 }
 
 static void sle_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
@@ -288,6 +417,9 @@ static void sle_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errc
         conn_id, status);
     sample_at_log_print("[uuid server] pair complete addr:%02x:**:**:**:%02x:%02x\r\n",
         addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4], addr->addr[BT_INDEX_5]);
+    if (status == 0) {
+        sample_at_log_print("[uuid server] pair done, waiting for client sync\r\n");
+    }
 }
 
 static void sle_conn_register_cbks(void)
@@ -310,17 +442,26 @@ errcode_t sle_uuid_server_init(void)
     return ERRCODE_SLE_SUCCESS;
 }
 
-#define SLE_UUID_SERVER_TASK_PRIO 26
-#define SLE_UUID_SERVER_STACK_SIZE 0x2000
+#define SLE_SERVER_TASK_STACK_SIZE 0x2000
+#define SLE_SERVER_STARTUP_DELAY_MS 1000
+
+static void sle_server_task(void *arg)
+{
+    (void)arg;
+    osal_msleep(SLE_SERVER_STARTUP_DELAY_MS);
+    sample_at_log_print("[server] starting SLE...\r\n");
+    sle_uuid_server_init();
+    at_led_command_register();
+}
 
 static void sle_uuid_server_entry(void)
 {
     osal_task *task_handle = NULL;
+
     osal_kthread_lock();
-    task_handle= osal_kthread_create((osal_kthread_handler)sle_uuid_server_init, 0, "sle_uuid_server",
-        SLE_UUID_SERVER_STACK_SIZE);
+    task_handle = osal_kthread_create((osal_kthread_handler)sle_server_task, 0,
+        "sle_server", SLE_SERVER_TASK_STACK_SIZE);
     if (task_handle != NULL) {
-        osal_kthread_set_priority(task_handle, SLE_UUID_SERVER_TASK_PRIO);
         osal_kfree(task_handle);
     }
     osal_kthread_unlock();

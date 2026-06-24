@@ -96,4 +96,5 @@ typedef enum {
  * @endif
  */
 errcode_t sle_uuid_server_adv_init(void);
+errcode_t sle_uuid_server_adv_restart(void);
 #endif

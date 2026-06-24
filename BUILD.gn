@@ -14,7 +14,7 @@
 import("//build/lite/config/component/lite_component.gni")
 
 lite_component("app") {
-  features = [ "startup",
+  features = [
     "work1:work1_demo",
     "work2:work2_demo",
   ]

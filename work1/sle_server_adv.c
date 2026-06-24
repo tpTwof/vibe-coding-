@@ -22,8 +22,6 @@
 #include "sle_errcode.h"
 #include "sle_server_adv.h"
 
-/* sle device name */
-#define NAME_MAX_LENGTH 15
 /* 连接调度间隔12.5ms，单位125us */
 #define SLE_CONN_INTV_MIN_DEFAULT                 0x64
 /* 连接调度间隔12.5ms，单位125us */
@@ -43,8 +41,7 @@
 /* 最大广播数据长度 */
 #define SLE_ADV_DATA_LEN_MAX                      251
 /* 广播名称 */
-uint8_t sle_local_name[ NAME_MAX_LENGTH] = { 's', 'l', 'e', '_', 'u', 'u', 'i', 'd', '_', 's',
-    'e', 'r', 'v', 'e', 'r' };
+static const uint8_t sle_local_name[] = "MacroPad";
 
 #define sample_at_log_print(fmt, args...) test_suite_uart_sendf(fmt, ##args)
 
@@ -53,8 +50,8 @@ static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
     errno_t ret;
     uint8_t index = 0;
 
-    uint8_t *local_name = sle_local_name;
-    uint8_t local_name_len = (uint8_t)strlen((char *)local_name);
+    const uint8_t *local_name = sle_local_name;
+    uint8_t local_name_len = (uint8_t)(sizeof(sle_local_name) - 1);
     for (uint8_t i = 0; i < local_name_len; i++) {
         sample_at_log_print("local_name[%d] = 0x%02x\r\n", i, local_name[i]);
     }
@@ -100,6 +97,10 @@ static uint16_t sle_set_adv_data(uint8_t *adv_data)
         return 0;
     }
     idx += len;
+
+    /* Keep the complete local name in the main announcement so that
+     * controller-level name filters can match without an active seek. */
+    idx += sle_set_adv_local_name(&adv_data[idx], SLE_ADV_DATA_LEN_MAX - idx);
     return idx;
 }
 
@@ -121,7 +122,7 @@ static uint16_t sle_set_scan_response_data(uint8_t *scan_rsp_data)
     }
     idx += scan_rsp_data_len;
 
-    /* set local name */
+    /* Keep the name in the seek response for the existing active SLE client. */
     idx += sle_set_adv_local_name(&scan_rsp_data[idx], SLE_ADV_DATA_LEN_MAX - idx);
     return idx;
 }
@@ -210,4 +211,15 @@ errcode_t sle_uuid_server_adv_init(void)
     sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
     sample_at_log_print("sle_uuid_server_adv_init out\r\n");
     return ERRCODE_SLE_SUCCESS;
+}
+
+errcode_t sle_uuid_server_adv_restart(void)
+{
+    errcode_t ret;
+    sample_at_log_print("sle_uuid_server_adv_restart\r\n");
+    sle_set_default_announce_param();
+    sle_set_default_announce_data();
+    ret = sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
+    sample_at_log_print("sle_uuid_server_adv_restart, start ret:%x\r\n", ret);
+    return ret;
 }

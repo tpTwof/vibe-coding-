@@ -18,6 +18,7 @@ static_library("work1_demo") {
 
         "//device/soc/hisilicon/ws63v100/sdk/include",
         "//device/soc/hisilicon/ws63v100/sdk/include/middleware/services/bts/sle",
+        "//device/soc/hisilicon/ws63v100/sdk/include/middleware/services/bts/common",
         "//device/soc/hisilicon/ws63v100/sdk/include/middleware/utils",
         "//device/soc/hisilicon/ws63v100/sdk/include/middleware",
         "//device/soc/hisilicon/ws63v100/sdk/include/driver",
@@ -26,6 +27,7 @@ static_library("work1_demo") {
         "//device/soc/hisilicon/ws63v100/sdk/kernel/osal/include/memory",
 
         "//device/soc/hisilicon/ws63v100/sdk/middleware/utils/app_init",
+        "//device/soc/hisilicon/ws63v100/sdk/middleware/chips/ws63/dfx/include",
         "//device/soc/hisilicon/ws63v100/sdk/drivers/drivers/hal/uart",
         "//device/soc/hisilicon/ws63v100/sdk/drivers/chips/ws63/porting/uart",
 
