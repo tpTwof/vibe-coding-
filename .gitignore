@@ -1,0 +1,11 @@
+# 忽略所有内容
+/*
+# 但保留 work1 和 work2
+!/work1/
+!/work2/
+# 保留自身
+!/.gitignore
+!/README.md
+!/BUILD.gn
+!/convert.py
+!/keymap.json
